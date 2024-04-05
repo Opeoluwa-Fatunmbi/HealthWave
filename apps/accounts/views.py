@@ -5,7 +5,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.throttling import UserRateThrottle
 from apps.common.exceptions import RequestError
 from apps.common.responses import CustomResponse
-from apps.accounts.models import User, Otp, Jwt
+from apps.accounts.models import User, Otp, AuthTransaction
 from apps.accounts.serializers import (
     RegisterSerializer,
     VerifyOtpSerializer,
@@ -22,6 +22,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from apps.common.utils import IsAuthenticatedCustom
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.generics import GenericAPIView
+from apps.common.utils import get_client_ip
 
 
 class RegisterView(APIView):
@@ -83,12 +84,16 @@ class LoginView(APIView):
 
         if not user.is_email_verified:
             raise RequestError(err_msg="Verify your email first", status_code=401)
-        await Jwt.objects.filter(user_id=user.id).adelete()
+        await AuthTransaction.objects.filter(user_id=user.id).adelete()
 
         # Create tokens and store in jwt model
         access = Authentication.create_access_token({"user_id": str(user.id)})
         refresh = Authentication.create_refresh_token()
-        await Jwt.objects.acreate(user_id=user.id, access=access, refresh=refresh)
+
+        # Get the IP Address of the user
+        ip_address=get_client_ip(self.request),
+
+        await AuthTransaction.objects.acreate(user_id=user.id, access=access, refresh=refresh, ip_address=ip_address)
 
         return CustomResponse.success(
             message="Login successful",
@@ -106,7 +111,7 @@ class LogoutView(APIView):
         description="This endpoint logs a user out from our application",
     )
     async def get(self, request):
-        await Jwt.objects.filter(user_id=request.user.id).adelete()
+        await AuthTransaction.objects.filter(user_id=request.user.id).adelete()
         return CustomResponse.success(message="Logout successful")
 
 
@@ -242,7 +247,7 @@ class RefreshTokensView(APIView):
         data = serializer.validated_data
 
         token = data["refresh"]
-        jwt = await Jwt.objects.get_or_none(refresh=token)
+        jwt = await AuthTransaction.objects.get_or_none(refresh=token)
 
         if not jwt:
             raise RequestError(err_msg="Refresh token does not exist", status_code=404)

@@ -40,11 +40,23 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.full_name
 
 
-class Jwt(BaseModel):
+class AuthTransaction(BaseModel):
+    """
+    Represents all authentication in the system that took place via
+    REST API.
+    """
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    ip_address = models.GenericIPAddressField(blank=False, null=False)
     access = models.TextField()
     refresh = models.TextField()
     blacklisted = models.BooleanField(default=False)
+
+    class Meta:
+        """Passing model metadata"""
+
+        verbose_name = _("Authentication Transaction")
+        verbose_name_plural = _("Authentication Transactions")
 
 
 class Otp(BaseModel):
